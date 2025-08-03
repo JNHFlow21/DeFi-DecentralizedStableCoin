@@ -23,7 +23,6 @@
 // private
 // view & pure functions
 
-
 pragma solidity ^0.8.20;
 
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -39,18 +38,14 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  * - 实现 Ownable 接口
  * - 实现burn/mint 方法
  */
-
 contract DecentralizedStableCoin is ERC20Burnable, Ownable {
-
     // errors
     error DecentralizedStableCoin__AmountMustBeGreaterThanZero();
     error DecentralizedStableCoin__BurnAmountExceedsBalance();
 
-    constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(msg.sender) {
+    constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(msg.sender) {}
 
-    }
-
-    function burn(uint256 amount) public override onlyOwner{
+    function burn(uint256 amount) public override onlyOwner {
         // _burn()会检查0地址，所以我们只需要判断
         // 1. amount <= 0 revert
         // 2. amount > balanceOf(msg.sender) revert
@@ -72,6 +67,4 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         _mint(to, amount);
         return true;
     }
-
-
 }
