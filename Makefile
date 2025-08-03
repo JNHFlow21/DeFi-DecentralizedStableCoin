@@ -123,3 +123,7 @@ deps-versions: ## 打印依赖版本信息
 	@printf "forge-std       : " ; git -C lib/forge-std describe --tags --always --abbrev=12 2>/dev/null || echo "not installed"
 	@printf "openzeppelin     : " ; git -C lib/openzeppelin-contracts describe --tags --always --abbrev=12 2>/dev/null || echo "not installed"
 	@printf "foundry-devops   : " ; git -C lib/foundry-devops describe --tags --always --abbrev=12 2>/dev/null || echo "not installed"
+
+push: ## 推送代码到远程仓库
+	@echo "🔍 Pushing code to remote repository..."
+	./push.sh

@@ -13,7 +13,7 @@ contract TestDecentralizedStableCoin is Test {
         num = 1;
     }
 
-    function testexm() public view{
-        assertEq(num,1);
+    function testexm() public view {
+        assertEq(num, 1);
     }
 }
