@@ -39,7 +39,7 @@ library PriceConverter {
      * @param priceFeed 价格预言机地址
      * @return 等值ETH数量，18位精度
      */
-    function getEthAmount(uint256 usdAmount, address priceFeed) internal view returns (uint256) {
+    function getTokenAmount(uint256 usdAmount, address priceFeed) internal view returns (uint256) {
         uint256 ethPrice = getPrice(priceFeed);
         // ETH价格有8位精度，转换为18位精度
         uint256 ethPriceInWei = ethPrice * 1e10;

@@ -24,13 +24,13 @@
 pragma solidity ^0.8.20;
 
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
-import {IDSCEngine} from "./interface/IDSCEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {PriceConverter} from "./libiry/PriceConverter.sol";
+import {PriceConverter} from "./_library/PriceConverter.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract DSCEngine is IDSCEngine {
+contract DSCEngine is ReentrancyGuard {
     /**
-     * !!! -------------- 注意精度问题-------------------- 
+     * !!! -------------- 注意精度问题--------------------
      * 代码中的 所有 DSC 精度都是 1e18， 因为ERC20的decimal是18
      * 所有 ETH/USDC 精度都是 1e8
      * 所有 抵押物 精度都是 1e18
@@ -39,6 +39,36 @@ contract DSCEngine is IDSCEngine {
      * 所有 抵押物价值 精度都是 1e18
      * 所有 债务价值 精度都是 1e18
      */
+
+    ///////////////////
+    // Errors
+    ///////////////////
+
+    /// @notice 传入的 token 地址数组和 price feed 地址数组长度不一致
+    error DSCEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
+
+    /// @notice 数量必须大于 0
+    error DSCEngine__NeedsMoreThanZero();
+
+    /// @notice 该 token 不是被允许的抵押品
+    /// @param token 地址
+    error DSCEngine__TokenNotAllowed(address token);
+
+    /// @notice ERC20 transfer/transferFrom 操作失败
+    error DSCEngine__TransferFailed();
+
+    /// @notice 操作导致用户健康因子低于最小安全值
+    /// @param healthFactorValue 当前 health factor（缩放后）
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactorValue);
+
+    /// @notice 铸造 DSC 失败
+    error DSCEngine__MintFailed();
+
+    /// @notice 目标用户 health factor 正常（用于拒绝清算）
+    error DSCEngine__HealthFactorOk();
+
+    /// @notice 清算后用户的 health factor 未改善（理论上不应发生）
+    error DSCEngine__HealthFactorNotImproved();
 
     // Type declarations
     using PriceConverter for uint256;
@@ -66,6 +96,61 @@ contract DSCEngine is IDSCEngine {
      */
     address[] private s_collateralTokens;
     DecentralizedStableCoin private immutable i_dsc;
+
+    ///////////////////
+    // Events
+    ///////////////////
+
+    /**
+     * @notice 某用户抵押了 token
+     * @param user 进行抵押的用户
+     * @param token 抵押的 ERC20 token 地址
+     * @param amount 抵押数量
+     */
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+
+    /**
+     * @notice 抵押被赎回（正常赎回或清算）
+     * @param redeemFrom 原始抵押人
+     * @param redeemTo 接收人（清算时可能不是原始人）
+     * @param token 抵押 token 地址
+     * @param amount 赎回数量
+     */
+    event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount);
+
+    /**
+     * @notice 铸造了 DSC（增加债务）
+     * @param user 受益人（债务被增加的账户）
+     * @param amountDscMinted 铸造的 DSC 数量
+     * @param postHealthFactor 铸造后该用户的健康因子
+     */
+    event DscMinted(address indexed user, uint256 amountDscMinted, uint256 postHealthFactor);
+
+    /**
+     * @notice DSC 被烧掉（还债 / 清算）
+     * @param onBehalfOf 谁的债务减少了
+     * @param amountDscBurned 烧掉的 DSC 数量
+     * @param postHealthFactor 操作后该账户的健康因子
+     */
+    event DscBurned(address indexed onBehalfOf, uint256 amountDscBurned, uint256 postHealthFactor);
+
+    /**
+     * @notice 清算操作发生
+     * @param collateral 被取走的抵押 token
+     * @param user 被清算的用户
+     * @param liquidator 执行清算的人
+     * @param debtCovered 覆盖的 DSC 债务
+     * @param collateralTaken 原始抵押（不含 bonus）
+     * @param bonusCollateral 清算奖励部分
+     */
+    event LiquidationPerformed(
+        address indexed collateral,
+        address indexed user,
+        address indexed liquidator,
+        uint256 debtCovered,
+        uint256 collateralTaken,
+        uint256 bonusCollateral
+    );
 
     // Modifiers
     modifier moreThanZero(uint256 amount) {
@@ -95,6 +180,14 @@ contract DSCEngine is IDSCEngine {
         }
         // 实例化dsc合约
         i_dsc = DecentralizedStableCoin(dscAddress);
+    }
+
+    receive() external payable {
+        revert("");
+    }
+
+    fallback() external payable {
+        revert("");
     }
 
     // external
@@ -140,9 +233,11 @@ contract DSCEngine is IDSCEngine {
      * @param tokenCollateralAddress 抵押 token 地址
      * @param amountCollateral 赎回数量
      */
-    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        external
         moreThanZero(amountCollateral)
-        isAllowedToken(tokenCollateralAddress){
+        isAllowedToken(tokenCollateralAddress)
+    {
         _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -151,7 +246,7 @@ contract DSCEngine is IDSCEngine {
      * @notice 只还债（burn DSC）
      * @param amount 想要 burn 的 DSC 数量
      */
-    function burnDsc(uint256 amount) external moreThanZero(amount){
+    function burnDsc(uint256 amount) external moreThanZero(amount) {
         _burnDsc(amount, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -170,17 +265,41 @@ contract DSCEngine is IDSCEngine {
      * @notice user mint 了100个dsc，抵押了价值200usd的eth，然后eth降价，hf不够，被清算。
      * @notice liquidator 用 自己的100个dsc 覆盖了 100个dsc 的债务，然后获得了 此时价值（100+10）usd 的eth（user 的抵押物）
      */
-    function liquidate(address collateral, address user, uint256 debtToCover) external
+    function liquidate(address collateral, address user, uint256 debtToCover)
+        external
         moreThanZero(debtToCover)
-        isAllowedToken(collateral){
+        isAllowedToken(collateral)
+        nonReentrant
+    {
+        uint256 startingUserHealthFactor = _healthFactor(user);
+        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+            revert DSCEngine__HealthFactorOk();
+        }
 
+        uint256 tokenAmountFromDebtCovered = _getTokenAmountFromUsd(collateral, debtToCover);
+
+        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+
+        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+        _redeemCollateral(collateral, totalCollateralToRedeem, user, msg.sender);
+        _burnDsc(debtToCover, user, msg.sender);
+
+        uint256 endingUserHealthFactor = _healthFactor(user);
+        if (endingUserHealthFactor >= startingUserHealthFactor) {
+            revert DSCEngine__HealthFactorNotImproved();
+        }
+
+        _revertIfHealthFactorIsBroken(msg.sender);
+        emit LiquidationPerformed(
+            collateral, user, msg.sender, debtToCover, tokenAmountFromDebtCovered, bonusCollateral
+        );
     }
 
     /**
      * @notice 单独铸造 DSC（不附带抵押操作）
      * @param amountDscToMint 铸造数量
      */
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint){
+    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) {
         _mintDsc(amountDscToMint, msg.sender);
     }
 
@@ -189,9 +308,11 @@ contract DSCEngine is IDSCEngine {
      * @param tokenCollateralAddress 抵押 token 地址
      * @param amountCollateral 抵押数量
      */
-    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external
-            moreThanZero(amountCollateral)
-        isAllowedToken(tokenCollateralAddress){
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        external
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
+    {
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
     }
 
@@ -293,7 +414,7 @@ contract DSCEngine is IDSCEngine {
      */
     function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
         internal
-        view
+        pure
         returns (uint256)
     {
         if (totalDscMinted == 0) return type(uint256).max;
@@ -309,6 +430,13 @@ contract DSCEngine is IDSCEngine {
      */
     function _getUsdValue(address token, uint256 amount) internal view returns (uint256) {
         return amount.getUsdValue(s_collateralTokenToPriceFeed[token]);
+    }
+
+    /**
+     * @dev 获取usd价值对应的抵押物token 数量，1e18精度
+     */
+    function _getTokenAmountFromUsd(address token, uint256 usdAmount) internal view returns (uint256) {
+        return usdAmount.getTokenAmount(s_collateralTokenToPriceFeed[token]);
     }
 
     // private
@@ -354,4 +482,66 @@ contract DSCEngine is IDSCEngine {
     }
 
     // view & pure functions
+
+    function calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+        external
+        pure
+        returns (uint256)
+    {
+        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+    }
+
+    function getAccountInformation(address user)
+        external
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        return _getAccountInformation(user);
+    }
+
+    function getUsdValue(address token, uint256 amount) external view returns (uint256) {
+        return _getUsdValue(token, amount);
+    }
+
+    function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
+        return s_collateralDeposited[user][token];
+    }
+
+    // Accessors for constants and state
+
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getLiquidationThreshold() external pure returns (uint256) {
+        return LIQUIDATION_THRESHOLD;
+    }
+
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    function getLiquidationPrecision() external pure returns (uint256) {
+        return LIQUIDATION_PRECISION;
+    }
+
+    function getMinHealthFactor() external pure returns (uint256) {
+        return MIN_HEALTH_FACTOR;
+    }
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getDsc() external view returns (address) {
+        return address(i_dsc);
+    }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        return s_collateralTokenToPriceFeed[token];
+    }
+
+    function getHealthFactor(address user) external view returns (uint256) {
+        return _healthFactor(user);
+    }
 }
