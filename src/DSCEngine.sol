@@ -26,6 +26,7 @@ pragma solidity ^0.8.20;
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {IDSCEngine} from "./interface/IDSCEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PriceConverter} from "./libiry/PriceConverter.sol";
 
 contract DSCEngine is IDSCEngine {
 
@@ -38,6 +39,9 @@ contract DSCEngine is IDSCEngine {
      * 所有 抵押物价值 精度都是 1e18
      * 所有 债务价值 精度都是 1e18
     */
+
+   // Type declarations
+   using PriceConverter for uint256;
 
 
     // State variables
@@ -117,6 +121,26 @@ contract DSCEngine is IDSCEngine {
     {
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
         _mintDsc(amountDscToMint, msg.sender);
+    }
+
+    /**
+     * @dev 这个函数的功能是用户赎回抵押物，并还债
+     * - 要注意的是 此时最后也要检查hf，避免还了一点钱，但是赎回了很多抵押物，导致账户不健康
+     * 1. 还债 burn dsc
+     * 2. 赎回 redeem token
+     * 3. 检查 hf
+     */
+    function redeemCollateralForDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToBurn
+    ) external
+    moreThanZero(amountCollateral)
+    moreThanZero(amountDscToBurn)
+    isAllowedToken(tokenCollateralAddress){
+        _burnDsc(amountDscToBurn, msg.sender, msg.sender);
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
 
@@ -230,10 +254,53 @@ contract DSCEngine is IDSCEngine {
      *  3. 返回token的USD价值
      */
      function _getUsdValue(address token, uint256 amount) internal view returns (uint256) {
- 
+        return amount.getUsdValue(s_collateralTokenToPriceFeed[token]);
      }
 
     // private
+    /**
+     * @dev 偿还人用自己的dsc偿还债务人的债务
+     * @param amountDscToBurn 要偿还的债务
+     * @param onBehalfOf 债务人
+     * @param dscFrom 偿还人
+     */
+    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
+        // 1. 减少债务人债务
+        s_DSCMinted[onBehalfOf] -= amountDscToBurn;
+        // 2. 偿还人将债务dsc转移到engine中
+        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        // 3. engine burn这些债务代币
+        i_dsc.burn(amountDscToBurn);
+        // 4. 更新债务人的hf
+        uint256 postHF = _healthFactor(onBehalfOf);
+        emit DscBurned(onBehalfOf, amountDscToBurn, postHF);
+    }
+
+    /**
+     * @dev 赎回抵押物
+     * @param tokenCollateralAddress 抵押物地址
+     * @param amountCollateral 赎回数量
+     * @param from 赎回人
+     * @param to 赎回目标地址
+     */
+    function _redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        address from,
+        address to
+    ) private {
+        // 1. 减少记录的抵押物数量
+        s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
+        // 2. 调用抵押物token的transfer方法，给to地址转抵押物
+        bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+    }
 
 
 

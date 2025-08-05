@@ -42,6 +42,7 @@ install: ## 安装依赖（forge-std）
 	forge install foundry-rs/forge-std
 	forge install OpenZeppelin/openzeppelin-contracts@v5.4.0
 	forge install Cyfrin/foundry-devops
+	forge install smartcontractkit/chainlink-brownie-contracts
 
 update: ## 更新依赖
 	forge update
