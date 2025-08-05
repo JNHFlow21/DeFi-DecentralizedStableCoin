@@ -29,8 +29,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PriceConverter} from "./libiry/PriceConverter.sol";
 
 contract DSCEngine is IDSCEngine {
-
-    /** !!! -------------- 注意精度问题-------------------- 
+    /**
+     * !!! -------------- 注意精度问题-------------------- 
      * 代码中的 所有 DSC 精度都是 1e18， 因为ERC20的decimal是18
      * 所有 ETH/USDC 精度都是 1e8
      * 所有 抵押物 精度都是 1e18
@@ -38,11 +38,10 @@ contract DSCEngine is IDSCEngine {
      * 所有 健康因子 精度都是 1e18
      * 所有 抵押物价值 精度都是 1e18
      * 所有 债务价值 精度都是 1e18
-    */
+     */
 
-   // Type declarations
-   using PriceConverter for uint256;
-
+    // Type declarations
+    using PriceConverter for uint256;
 
     // State variables
 
@@ -83,7 +82,6 @@ contract DSCEngine is IDSCEngine {
         _;
     }
 
-
     // constructor
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
         // 首先检查长度是否一致，不一致直接revert
@@ -114,11 +112,7 @@ contract DSCEngine is IDSCEngine {
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountDscToMint
-    ) external 
-    moreThanZero(amountCollateral)
-    moreThanZero(amountDscToMint)
-    isAllowedToken(tokenCollateralAddress)
-    {
+    ) external moreThanZero(amountCollateral) moreThanZero(amountDscToMint) isAllowedToken(tokenCollateralAddress) {
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
         _mintDsc(amountDscToMint, msg.sender);
     }
@@ -130,19 +124,76 @@ contract DSCEngine is IDSCEngine {
      * 2. 赎回 redeem token
      * 3. 检查 hf
      */
-    function redeemCollateralForDsc(
-        address tokenCollateralAddress,
-        uint256 amountCollateral,
-        uint256 amountDscToBurn
-    ) external
-    moreThanZero(amountCollateral)
-    moreThanZero(amountDscToBurn)
-    isAllowedToken(tokenCollateralAddress){
+    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
+        external
+        moreThanZero(amountCollateral)
+        moreThanZero(amountDscToBurn)
+        isAllowedToken(tokenCollateralAddress)
+    {
         _burnDsc(amountDscToBurn, msg.sender, msg.sender);
         _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
+    /**
+     * @notice 只赎回抵押品（不减少债务）
+     * @param tokenCollateralAddress 抵押 token 地址
+     * @param amountCollateral 赎回数量
+     */
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress){
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    /**
+     * @notice 只还债（burn DSC）
+     * @param amount 想要 burn 的 DSC 数量
+     */
+    function burnDsc(uint256 amount) external moreThanZero(amount){
+        _burnDsc(amount, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    /**
+     * @notice 清算一个欠抵押的用户，用自己的 DSC 覆盖其债务并获取其抵押（含 bonus）
+     * @param collateral 被用作抵押的 token 地址
+     * @param user 被清算的目标用户
+     * @param debtToCover 想覆盖的 DSC 债务量
+     * 1. 首先判断 user的hf，是否能被清算
+     * 2. 根据被清算人拥有的dsc数量，计算得到被清算人的对应抵押物数量1e18，不一定抵押物会被全部清算，有可能抵押物升值了，所以说是部分
+     * 3. 清算人还能获得bonus，获得上面抵押物数量的10%
+     * 4. 根据2，3计算出要 要转走的总抵押物数量，然后调用_redeem(),此时欠债人的抵押物已被转走
+     * 5. _burn 掉 清算人的dsc，偿还债务
+     * 6. 清算结束，分别判断下欠债人和偿还人 的 hf
+     * @notice user mint 了100个dsc，抵押了价值200usd的eth，然后eth降价，hf不够，被清算。
+     * @notice liquidator 用 自己的100个dsc 覆盖了 100个dsc 的债务，然后获得了 此时价值（100+10）usd 的eth（user 的抵押物）
+     */
+    function liquidate(address collateral, address user, uint256 debtToCover) external
+        moreThanZero(debtToCover)
+        isAllowedToken(collateral){
+
+    }
+
+    /**
+     * @notice 单独铸造 DSC（不附带抵押操作）
+     * @param amountDscToMint 铸造数量
+     */
+    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint){
+        _mintDsc(amountDscToMint, msg.sender);
+    }
+
+    /**
+     * @notice 单独抵押某个 token
+     * @param tokenCollateralAddress 抵押 token 地址
+     * @param amountCollateral 抵押数量
+     */
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external
+            moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress){
+        _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
+    }
 
     // public
 
@@ -154,7 +205,7 @@ contract DSCEngine is IDSCEngine {
      *  3. 调用_getUsdValue计算每个token的USD价值
      *  4. 将每个token的USD价值相加，得到总抵押物价值totalCollateralValueInUsd，然后返回
      */
-    function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd){
+    function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_collateralDeposited[user][token];
@@ -162,7 +213,6 @@ contract DSCEngine is IDSCEngine {
         }
         return totalCollateralValueInUsd;
     }
-
 
     // internal
 
@@ -172,11 +222,7 @@ contract DSCEngine is IDSCEngine {
      *  2. 调用IERC20的transferFrom方法，将用户抵押的token从用户地址转移到合约地址，如果失败revert
      *  3. transferFrom和transfer的区别就是，前者是第三方代转帐会检查allowance，所以需要先approve，后者是账户所有者自己转账不会检查allowance
      */
-    function _depositCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral,
-        address user
-    ) internal {
+    function _depositCollateral(address tokenCollateralAddress, uint256 amountCollateral, address user) internal {
         s_collateralDeposited[user][tokenCollateralAddress] += amountCollateral;
         emit CollateralDeposited(user, tokenCollateralAddress, amountCollateral);
 
@@ -227,7 +273,11 @@ contract DSCEngine is IDSCEngine {
      * - 总负债：mint的dsc 数量
      * - 总抵押物价值：ETH/USDC 此时的 USD价值
      */
-    function _getAccountInformation(address user) internal view returns (uint256 totalDscMinted, uint256 collateralValueInUsd) {
+    function _getAccountInformation(address user)
+        internal
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
         totalDscMinted = s_DSCMinted[user];
         collateralValueInUsd = getAccountCollateralValue(user);
     }
@@ -241,11 +291,15 @@ contract DSCEngine is IDSCEngine {
      *      先乘后除 collateralAdjustedForThreshold = 200e18 * 50 / 100 = 100e18
      *  3. 最后，计算 hf = collateralAdjustedForThreshold / totalDscMinted = 100e18 / 100e18 = 1 还要对齐精度所以* PRECISION = 1e18
      */
-    function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd) internal view returns (uint256) {
+    function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+        internal
+        view
+        returns (uint256)
+    {
         if (totalDscMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
-     }
+    }
 
     /**
      * @dev 获取token（抵押物）的USD价值 1e18精度
@@ -253,9 +307,9 @@ contract DSCEngine is IDSCEngine {
      *  2. 将token的USD价值乘以amount，得到token的USD价值
      *  3. 返回token的USD价值
      */
-     function _getUsdValue(address token, uint256 amount) internal view returns (uint256) {
+    function _getUsdValue(address token, uint256 amount) internal view returns (uint256) {
         return amount.getUsdValue(s_collateralTokenToPriceFeed[token]);
-     }
+    }
 
     // private
     /**
@@ -286,12 +340,9 @@ contract DSCEngine is IDSCEngine {
      * @param from 赎回人
      * @param to 赎回目标地址
      */
-    function _redeemCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral,
-        address from,
-        address to
-    ) private {
+    function _redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral, address from, address to)
+        private
+    {
         // 1. 减少记录的抵押物数量
         s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
         emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
@@ -302,10 +353,5 @@ contract DSCEngine is IDSCEngine {
         }
     }
 
-
-
     // view & pure functions
-
-
-
 }

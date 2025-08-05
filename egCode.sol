@@ -60,7 +60,11 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_PRECISION = 100;
 
     uint256 private constant MIN_HEALTH_FACTOR = 1e18; // health factor minimal acceptable (1 * 1e18)
-    uint256 private constant PRECISION = 1e18; // universal internal scaling for ratios
+    uint256 private constant PRECISION = 1e18; // universal 
+    
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    
+    uint256 private constant FEED_PRECISION = 1e8;
 
     /// @dev Mapping of collateral token to its price feed
     mapping(address collateralToken => address priceFeed) private s_priceFeeds;
