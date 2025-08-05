@@ -1,33 +1,26 @@
-# ======= Help 系统（自动扫描）=======
-.DEFAULT_GOAL := help
-
-# 颜色
-C_BOLD := \033[1m
-C_DIM  := \033[2m
-C_CYAN := \033[36m
-C_RED  := \033[31m
-C_RST  := \033[0m
-
-# help：扫描所有包含 "##" 的目标行；"### " 开头的行视为分组标题
 help: ## 显示帮助（默认目标）
 	@printf "\n$(C_BOLD)用法：$(C_RST) make $(C_CYAN)<TARGET>$(C_RST) [VAR=val]\n\n"
-	@awk ' \
-	BEGIN {FS":.*##"; OFS="";} \
-	/^### / { \
-		printf "\n$(C_BOLD)%s$(C_RST)\n", substr($$0,5); next \
-	} \
-	/^[a-zA-Z0-9_.-]+:.*##/ { \
-		printf "  $(C_CYAN)%-24s$(C_RST) %s\n", $$1, $$2 \
+	@awk 'BEGIN { OFS=""; } \
+	/^### / { printf "\n\033[1m%s\033[0m\n", substr($$0,5); next } \
+	/^[^[:space:]]+:.*##/ { \
+		target=$$1; sub(/:$$/,"",target); \
+		idx=index($$0,"##"); \
+		desc=""; if (idx) { desc=substr($$0, idx+2) } ; \
+		gsub(/^[ \t]+/,"",desc); \
+		printf "  \033[36m%-30s\033[0m %s\n", target, desc; \
 	}' $(MAKEFILE_LIST)
-	@printf "\n$(C_DIM)提示：可用 \047make test-某用例\047 跑单测；用 \047VAR=...\047 传参（如 SEPOLIA_RPC_URL）。$(C_RST)\n"
+	@printf "\n$(C_DIM)提示：可用 'make test-某用例' 跑单测；用 'VAR=...' 传参（如 SEPOLIA_RPC_URL）。$(C_RST)\n"
 
-# help-<keyword>：按关键字过滤（如：make help-deploy）
-help-%:
-	@awk -v kw="$(word 2,$(MAKECMDGOALS))" ' \
-	BEGIN {FS":.*##"; OFS=""; found=0;} \
-	/^[a-zA-Z0-9_.-]+:.*##/ { \
-		tol=tolower($$0); if (index(tol, tolower(kw))) { \
-			printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2; found=1 \
+help-%: ## 按关键字搜索目标
+	@awk -v kw="$(word 2,$(MAKECMDGOALS))" 'BEGIN { OFS=""; found=0; } \
+	/^[^[:space:]]+:.*##/ { \
+		line=$$0; tl=tolower(line); if (index(tl, tolower(kw))) { \
+			target=$$1; sub(/:$$/,"",target); \
+			idx=index(line,"##"); \
+			desc=""; if (idx) { desc=substr(line, idx+2) } ; \
+			gsub(/^[ \t]+/,"",desc); \
+			printf "  \033[36m%-30s\033[0m %s\n", target, desc; \
+			found=1; \
 		} \
 	} \
 	END { if (!found) { printf "\033[31m未找到包含关键字：%s 的目标。\033[0m\n", kw } }' $(MAKEFILE_LIST)
@@ -127,3 +120,7 @@ deps-versions: ## 打印依赖版本信息
 push: ## 推送代码到远程仓库
 	@echo "🔍 Pushing code to remote repository..."
 	./push.sh
+
+pull: ## 拉取代码到本地
+	@echo "🔍 Pulling code from remote repository..."
+	./pull.sh
