@@ -15,16 +15,19 @@ contract DeployDSCEngine is Script {
     address[] private s_tokenAddresses;
     address[] private s_priceFeedAddresses;
 
-    function run() public returns (DecentralizedStableCoin, DSCEngine) {
-        vm.startBroadcast();
+    function run() public returns (DecentralizedStableCoin, DSCEngine, ChainConfig memory) {
+        vm.startBroadcast(chainConfig.deployerPrivateKey);
         DecentralizedStableCoin dsc = new DecentralizedStableCoin();
+
+        initTokenAddressesAndPriceFeed();
+
         DSCEngine engine = new DSCEngine(
             s_tokenAddresses,
             s_priceFeedAddresses,
             address(dsc)
         );
         vm.stopBroadcast();
-        return (dsc, engine);
+        return (dsc, engine, chainConfig);
     }
 
     function initTokenAddressesAndPriceFeed() private {

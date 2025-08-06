@@ -70,6 +70,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @notice 清算后用户的 health factor 未改善（理论上不应发生）
     error DSCEngine__HealthFactorNotImproved();
 
+    /// @notice 不允许调用
+    error DSCEngine__CallNotAllowed();
+
     // Type declarations
     using PriceConverter for uint256;
 
@@ -183,11 +186,11 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     receive() external payable {
-        revert("");
+        revert DSCEngine__CallNotAllowed();
     }
 
     fallback() external payable {
-        revert("");
+        revert DSCEngine__CallNotAllowed();
     }
 
     // external
@@ -205,7 +208,7 @@ contract DSCEngine is ReentrancyGuard {
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountDscToMint
-    ) external moreThanZero(amountCollateral) moreThanZero(amountDscToMint) isAllowedToken(tokenCollateralAddress) {
+    ) external moreThanZero(amountCollateral) moreThanZero(amountDscToMint) isAllowedToken(tokenCollateralAddress) nonReentrant{
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
         _mintDsc(amountDscToMint, msg.sender);
     }
@@ -222,6 +225,7 @@ contract DSCEngine is ReentrancyGuard {
         moreThanZero(amountCollateral)
         moreThanZero(amountDscToBurn)
         isAllowedToken(tokenCollateralAddress)
+        nonReentrant
     {
         _burnDsc(amountDscToBurn, msg.sender, msg.sender);
         _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
@@ -237,6 +241,7 @@ contract DSCEngine is ReentrancyGuard {
         external
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
+        nonReentrant
     {
         _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -246,7 +251,7 @@ contract DSCEngine is ReentrancyGuard {
      * @notice 只还债（burn DSC）
      * @param amount 想要 burn 的 DSC 数量
      */
-    function burnDsc(uint256 amount) external moreThanZero(amount) {
+    function burnDsc(uint256 amount) external moreThanZero(amount) nonReentrant{
         _burnDsc(amount, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -312,6 +317,7 @@ contract DSCEngine is ReentrancyGuard {
         external
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
+        nonReentrant
     {
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
     }

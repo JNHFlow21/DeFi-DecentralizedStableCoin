@@ -61,7 +61,6 @@ contract HelperConfig is Script {
         MockToken weth = new MockToken("WETH", "WETH");
         MockToken wbtc = new MockToken("WBTC", "WBTC");
 
-
         vm.stopBroadcast();
 
         AnvilConfig = ChainConfig({
