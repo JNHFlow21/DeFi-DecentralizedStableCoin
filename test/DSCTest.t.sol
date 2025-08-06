@@ -24,7 +24,7 @@ contract DSCTest is Test {
         dsc.mint(owner, 100);
     }
 
-    function test_dsc_constructor() public view{
+    function test_dsc_constructor() public view {
         assertEq(dsc.name(), "DecentralizedStableCoin");
         assertEq(dsc.symbol(), "DSC");
         assertEq(dsc.decimals(), 18);
@@ -67,5 +67,4 @@ contract DSCTest is Test {
         dsc.burn(110);
         vm.stopPrank();
     }
-    
 }

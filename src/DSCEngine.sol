@@ -208,7 +208,13 @@ contract DSCEngine is ReentrancyGuard {
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountDscToMint
-    ) external moreThanZero(amountCollateral) moreThanZero(amountDscToMint) isAllowedToken(tokenCollateralAddress) nonReentrant{
+    )
+        external
+        moreThanZero(amountCollateral)
+        moreThanZero(amountDscToMint)
+        isAllowedToken(tokenCollateralAddress)
+        nonReentrant
+    {
         _depositCollateral(tokenCollateralAddress, amountCollateral, msg.sender);
         _mintDsc(amountDscToMint, msg.sender);
     }
@@ -251,7 +257,7 @@ contract DSCEngine is ReentrancyGuard {
      * @notice 只还债（burn DSC）
      * @param amount 想要 burn 的 DSC 数量
      */
-    function burnDsc(uint256 amount) external moreThanZero(amount) nonReentrant{
+    function burnDsc(uint256 amount) external moreThanZero(amount) nonReentrant {
         _burnDsc(amount, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }

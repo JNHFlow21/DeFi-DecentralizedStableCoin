@@ -9,6 +9,9 @@ import {DeployDSCEngine} from "../script/DeployDSCEngine.s.sol";
 import {ChainConfig} from "../script/HelperConfig.s.sol";
 
 contract DSCEngineTest is Test {
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event DscMinted(address indexed user, uint256 amountDscMinted, uint256 postHealthFactor);
+
     DeployDSCEngine deployer;
     DecentralizedStableCoin dsc;
     DSCEngine engine;
@@ -35,7 +38,7 @@ contract DSCEngineTest is Test {
         weth = MockToken(chainConfig.weth);
         wbtc = MockToken(chainConfig.wbtc);
 
-        // 给alice和bob一些合法抵押物 
+        // 给alice和bob一些合法抵押物
         // 100 weth = 300000 usd = 150000 dsc
         weth.mint(alice, INITIAL_TOKEN_AMOUNT);
         weth.mint(bob, INITIAL_TOKEN_AMOUNT);
@@ -62,9 +65,9 @@ contract DSCEngineTest is Test {
         vm.startPrank(user);
         vm.deal(user, 1 ether);
         // 准备触发 receive：空 data，带 value
-        vm.expectRevert(DSCEngine.DSCEngine__CallNotAllowed.selector); 
+        vm.expectRevert(DSCEngine.DSCEngine__CallNotAllowed.selector);
         address(engine).call{value: 1 wei}("");
-        
+
         // 准备触发 fallback：非空 data（也可以空 data，但 value 不可带，否则走 receive）
         vm.expectRevert(DSCEngine.DSCEngine__CallNotAllowed.selector);
         address(engine).call(abi.encodePacked(uint16(0x1234)));
@@ -78,6 +81,23 @@ contract DSCEngineTest is Test {
     function test_depositCollateralAndMintDsc_success() public {
         vm.startPrank(alice);
         weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
+
+        // 先计算预估抵押后的 HF
+        // 先计算抵押对应的 USD 价值
+        uint256 collateralValueUsd = engine.getUsdValue(chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+        // 再计算铸币之后的健康因子
+        uint256 expectedHF = engine.calculateHealthFactor(MAX_DEBT_IN_WETH, collateralValueUsd);
+
+        // 1. 期待第一个事件：CollateralDeposited
+        //    topic0（签名），topic1(user)，topic2(token)，topic3(amount) 都要校验
+        vm.expectEmit(true, true, true, true);
+        emit CollateralDeposited(alice, address(weth), MAX_COLLATERAL_AMOUNT);
+
+        // 2. 期待第二个事件：DscMinted
+        //    校验签名、indexed user、data（amountDscMinted + postHealthFactor）
+        vm.expectEmit(true, false, false, true);
+        emit DscMinted(alice, MAX_DEBT_IN_WETH, expectedHF);
+
         engine.depositCollateralAndMintDsc(chainConfig.weth, MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
         vm.stopPrank();
 
@@ -97,8 +117,7 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
-    function test_redeemCollateralForDsc_success() public{
-        
+    function test_redeemCollateralForDsc_success() public {
         vm.startPrank(alice);
         // 抵押物品
         // alice 给 engine 授权 允许转走 MAX_COLLATERAL_AMOUNT 数量的 weth token。
@@ -117,5 +136,8 @@ contract DSCEngineTest is Test {
         assertEq(engine.getHealthFactor(alice), type(uint256).max);
     }
 
-    
+    /**
+     * @dev 仅赎回：不改变债务，只执行 _redeemCollateral，触发 CollateralRedeemed 并做 HF 校验。
+     */
+    function test_redeemCollateral_success() public {}
 }

@@ -21,14 +21,10 @@ contract DeployDSCEngine is Script {
 
         initTokenAddressesAndPriceFeed();
 
-        DSCEngine engine = new DSCEngine(
-            s_tokenAddresses,
-            s_priceFeedAddresses,
-            address(dsc)
-        );
+        DSCEngine engine = new DSCEngine(s_tokenAddresses, s_priceFeedAddresses, address(dsc));
 
         dsc.transferOwnership(address(engine));
-        
+
         vm.stopBroadcast();
         return (dsc, engine, chainConfig);
     }
