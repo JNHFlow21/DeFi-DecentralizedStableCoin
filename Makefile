@@ -64,6 +64,18 @@ format: ## 格式化代码
 test-%: ## 跑单个测试用例：make test-<TestName>
 	forge test --match-test $* -vvvv
 
+errors: ## 列出指定合约里所有自定义错误及其 selector；如果传入 sig，则只显示匹配该 selector 的行
+	@if [ -z "$(con)" ]; then \
+		echo "Usage: make errors con=path/to/YourContract.sol:ContractName [sig=selector]"; \
+		exit 1; \
+	fi
+	@echo "Inspecting errors in $(con)"; \
+	if [ -z "$(sig)" ]; then \
+		forge inspect $(con) errors; \
+	else \
+		forge inspect $(con) errors | grep $(sig); \
+	fi
+
 ### ========== 本地链 ==========
 anvil: ## 启动本地 Anvil（12s出块，含助记词）
 	@echo "🚀 Starting local Anvil chain..."

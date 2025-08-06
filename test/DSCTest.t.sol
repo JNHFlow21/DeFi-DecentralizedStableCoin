@@ -19,7 +19,7 @@ contract DSCTest is Test {
     function setUp() public {
         deployer = new DeployDSCEngine();
         (dsc, engine, chainConfig) = deployer.run();
-        owner = vm.addr(chainConfig.deployerPrivateKey);
+        owner = address(engine);
         vm.prank(owner);
         dsc.mint(owner, 100);
     }

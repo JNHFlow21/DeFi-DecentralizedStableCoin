@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test, console2} from "forge-std/Test.sol";
 import {DSCEngine} from "../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
-import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {MockToken} from "../src/mocks/mock_WETH_WBTC.sol";
 import {DeployDSCEngine} from "../script/DeployDSCEngine.s.sol";
 import {ChainConfig} from "../script/HelperConfig.s.sol";
 
@@ -13,8 +13,10 @@ contract DSCEngineTest is Test {
     DecentralizedStableCoin dsc;
     DSCEngine engine;
     ChainConfig chainConfig;
-    ERC20Mock weth;
-    ERC20Mock wbtc;
+    MockToken weth;
+    MockToken wbtc;
+
+    MockToken junkToken = new MockToken("JUNK", "JUNK");
 
     address public owner;
     address public user = makeAddr("user");
@@ -30,8 +32,8 @@ contract DSCEngineTest is Test {
         deployer = new DeployDSCEngine();
         (dsc, engine, chainConfig) = deployer.run();
         owner = vm.addr(chainConfig.deployerPrivateKey);
-        weth = ERC20Mock(chainConfig.weth);
-        wbtc = ERC20Mock(chainConfig.wbtc);
+        weth = MockToken(chainConfig.weth);
+        wbtc = MockToken(chainConfig.wbtc);
 
         // 给alice和bob一些合法抵押物 
         // 100 weth = 300000 usd = 150000 dsc
@@ -40,6 +42,8 @@ contract DSCEngineTest is Test {
         // 100 wbtc = 1100000 usd = 550000 dsc
         wbtc.mint(alice, INITIAL_TOKEN_AMOUNT);
         wbtc.mint(bob, INITIAL_TOKEN_AMOUNT);
+        junkToken.mint(alice, INITIAL_TOKEN_AMOUNT);
+        junkToken.mint(bob, INITIAL_TOKEN_AMOUNT);
     }
 
     function test_engine_constructor() public view {
@@ -83,8 +87,14 @@ contract DSCEngineTest is Test {
         assertEq(engine.getHealthFactor(alice), engine.getMinHealthFactor());
     }
 
-    function test_depositCollateralAndMintDsc_reverts_when_not_enough_collateral() public {
+    function test_depositCollateralAndMintDsc_reverts_DSCEngine__TokenNotAllowed() public {
+        vm.startPrank(alice);
+        weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
 
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__TokenNotAllowed.selector, address(junkToken)));
+        engine.depositCollateralAndMintDsc(address(junkToken), MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
+
+        vm.stopPrank();
     }
 
     
