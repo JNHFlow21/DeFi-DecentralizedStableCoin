@@ -29,7 +29,7 @@ contract HelperConfig is Script {
     string constant ANVIL_PRIVATE_KEY = "ANVIL_PRIVATE_KEY";
     // Price Feed Variables
     uint8 public constant DECIMALS = 8;
-    int256 public constant INITIAL_ETH_PRICE = 2000e8; // 2000 USD
+    int256 public constant INITIAL_ETH_PRICE = 3000e8;
     int256 public constant INITIAL_BTC_PRICE = 11000e8; 
 
     constructor() {

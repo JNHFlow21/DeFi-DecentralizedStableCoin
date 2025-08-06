@@ -26,6 +26,9 @@ contract DeployDSCEngine is Script {
             s_priceFeedAddresses,
             address(dsc)
         );
+
+        dsc.transferOwnership(address(engine));
+        
         vm.stopBroadcast();
         return (dsc, engine, chainConfig);
     }
