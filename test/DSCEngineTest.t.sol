@@ -97,5 +97,25 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    function test_redeemCollateralForDsc_success() public{
+        
+        vm.startPrank(alice);
+        // 抵押物品
+        // alice 给 engine 授权 允许转走 MAX_COLLATERAL_AMOUNT 数量的 weth token。
+        weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
+        engine.depositCollateralAndMintDsc(chainConfig.weth, MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
+
+        // 赎回物品
+        // alice 给 engine 授权 允许转走 MAX_DEBT_IN_WETH 数量的 dsc token。
+        dsc.approve(address(engine), MAX_DEBT_IN_WETH);
+        engine.redeemCollateralForDsc(chainConfig.weth, MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
+        vm.stopPrank();
+
+        assertEq(weth.balanceOf(alice), INITIAL_TOKEN_AMOUNT);
+        assertEq(engine.getCollateralBalanceOfUser(alice, chainConfig.weth), 0);
+        assertEq(engine.getDscMinted(alice), 0);
+        assertEq(engine.getHealthFactor(alice), type(uint256).max);
+    }
+
     
 }
