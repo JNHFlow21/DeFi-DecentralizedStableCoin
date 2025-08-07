@@ -296,7 +296,7 @@ contract DSCEngine is ReentrancyGuard {
         _burnDsc(debtToCover, user, msg.sender);
 
         uint256 endingUserHealthFactor = _healthFactor(user);
-        if (endingUserHealthFactor >= startingUserHealthFactor) {
+        if (endingUserHealthFactor <= startingUserHealthFactor) {
             revert DSCEngine__HealthFactorNotImproved();
         }
 
@@ -477,8 +477,8 @@ contract DSCEngine is ReentrancyGuard {
      * @dev 赎回抵押物
      * @param tokenCollateralAddress 抵押物地址
      * @param amountCollateral 赎回数量
-     * @param from 赎回人
-     * @param to 赎回目标地址
+     * @param from 谁的抵押物
+     * @param to 赎回之后给谁
      */
     function _redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral, address from, address to)
         private
@@ -559,5 +559,9 @@ contract DSCEngine is ReentrancyGuard {
 
     function getDscMinted(address user) external view returns (uint256) {
         return s_DSCMinted[user];
+    }
+
+    function getCollateralAmountFromUsd(address token, uint256 usdAmount) external view returns (uint256) {
+        return _getTokenAmountFromUsd(token, usdAmount);
     }
 }
