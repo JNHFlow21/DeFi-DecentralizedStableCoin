@@ -243,6 +243,16 @@ contract DSCEngineTest is Test {
         assertEq(engine.getDscMinted(alice), mintAmt);
     }
 
+    function test_calculateHealthFactor_zeroDebt_returnsMax() public view{
+        uint256 hf = engine.calculateHealthFactor(0, 123);
+        assertEq(hf, type(uint256).max);
+    }
+
+    function test_calculateHealthFactor_formula() public view{
+        uint256 hf = engine.calculateHealthFactor(100 ether, 200 ether); // 200USD 抵押, 100DSC 债务
+        assertEq(hf, 1e18); // (200*50%)/100 = 1  → 1e18
+    }
+
     /**
      * @dev liquidate(address collateral, address user, uint256 debtToCover)
      * 参数校验：
