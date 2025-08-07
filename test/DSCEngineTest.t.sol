@@ -186,6 +186,30 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    function test_burnDsc_success() public {
+        vm.startPrank(alice);
+        // 先抵押并铸 100 000 DSC
+        weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
+        engine.depositCollateralAndMintDsc(chainConfig.weth, MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
+
+        uint256 burnAmt = 10_000 ether; // 1万枚
+        dsc.approve(address(engine), burnAmt);
+
+        // 计算烧后 HF
+        uint256 debtAfter = MAX_DEBT_IN_WETH - burnAmt;
+        uint256 colUsd = engine.getUsdValue(chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+        uint256 expectHF = engine.calculateHealthFactor(debtAfter, colUsd);
+
+        vm.expectEmit(true, false, false, true);
+        emit DscBurned(alice, burnAmt, expectHF);
+
+        engine.burnDsc(burnAmt);
+        vm.stopPrank();
+
+        assertEq(engine.getDscMinted(alice), debtAfter);
+        assertEq(dsc.balanceOf(alice), MAX_DEBT_IN_WETH - burnAmt);
+    }
+
     /**
      * @dev liquidate(address collateral, address user, uint256 debtToCover)
      * 参数校验：
@@ -221,7 +245,7 @@ contract DSCEngineTest is Test {
         // Bob 选择部分清算 50_000 DSC
         uint256 debtToCover = 50_000e18;
         uint256 collateralTaken = engine.getCollateralAmountFromUsd(chainConfig.weth, debtToCover); // 33.3
-        uint256 bonus = (collateralTaken * engine.getLiquidationBonus())/ engine.getLiquidationPrecision(); // 3.3
+        uint256 bonus = (collateralTaken * engine.getLiquidationBonus()) / engine.getLiquidationPrecision(); // 3.3
         uint256 totalCollateralTaken = collateralTaken + bonus; // 总共要拿走的weth数量，36.6
 
         // 计算之后的HF
@@ -231,7 +255,7 @@ contract DSCEngineTest is Test {
         uint256 expectedPostHF = engine.calculateHealthFactor(debtAfter, collateralUsd);
 
         // 给bob dsc余额，然后授权给engine
-        deal(address(dsc), bob, debtToCover);    // 作弊把余额写进去
+        deal(address(dsc), bob, debtToCover); // 作弊把余额写进去
         dsc.approve(address(engine), debtToCover);
 
         //  执行 _redeemCollateral 给清算者，触发 CollateralRedeemed；
