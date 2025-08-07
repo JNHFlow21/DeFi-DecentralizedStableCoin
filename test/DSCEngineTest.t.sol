@@ -9,8 +9,14 @@ import {DeployDSCEngine} from "../script/DeployDSCEngine.s.sol";
 import {ChainConfig} from "../script/HelperConfig.s.sol";
 
 contract DSCEngineTest is Test {
+    // 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event DscMinted(address indexed user, uint256 amountDscMinted, uint256 postHealthFactor);
+
+    //
+    event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount);
+    event DscBurned(address indexed onBehalfOf, uint256 amountDscBurned, uint256 postHealthFactor);
+
 
     DeployDSCEngine deployer;
     DecentralizedStableCoin dsc;
@@ -127,6 +133,15 @@ contract DSCEngineTest is Test {
         // 赎回物品
         // alice 给 engine 授权 允许转走 MAX_DEBT_IN_WETH 数量的 dsc token。
         dsc.approve(address(engine), MAX_DEBT_IN_WETH);
+
+        // 期待第一个事件
+        vm.expectEmit(true, false, false, true);
+        emit DscBurned(alice, MAX_DEBT_IN_WETH, type(uint256).max);
+
+        // 期待第二个事件
+        vm.expectEmit(true, true, false, true);
+        emit CollateralRedeemed(alice, alice, chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+
         engine.redeemCollateralForDsc(chainConfig.weth, MAX_COLLATERAL_AMOUNT, MAX_DEBT_IN_WETH);
         vm.stopPrank();
 
