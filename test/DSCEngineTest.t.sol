@@ -223,6 +223,26 @@ contract DSCEngineTest is Test {
         assertEq(engine.getCollateralBalanceOfUser(alice, chainConfig.weth), MAX_COLLATERAL_AMOUNT);
     }
 
+    function test_mintDsc_only_success() public {
+        vm.startPrank(alice);
+        // 先只抵押
+        weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
+        engine.depositCollateral(chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+
+        uint256 mintAmt = 50_000 ether;
+        uint256 colUsd = engine.getUsdValue(chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+        uint256 expectHF = engine.calculateHealthFactor(mintAmt, colUsd);
+
+        vm.expectEmit(true, false, false, true);
+        emit DscMinted(alice, mintAmt, expectHF);
+
+        engine.mintDsc(mintAmt);
+        vm.stopPrank();
+
+        assertEq(dsc.balanceOf(alice), mintAmt);
+        assertEq(engine.getDscMinted(alice), mintAmt);
+    }
+
     /**
      * @dev liquidate(address collateral, address user, uint256 debtToCover)
      * 参数校验：
