@@ -210,6 +210,19 @@ contract DSCEngineTest is Test {
         assertEq(dsc.balanceOf(alice), MAX_DEBT_IN_WETH - burnAmt);
     }
 
+    function test_depositCollateral_only_success() public {
+        vm.startPrank(alice);
+        weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
+
+        vm.expectEmit(true, true, true, true);
+        emit CollateralDeposited(alice, chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+
+        engine.depositCollateral(chainConfig.weth, MAX_COLLATERAL_AMOUNT);
+        vm.stopPrank();
+
+        assertEq(engine.getCollateralBalanceOfUser(alice, chainConfig.weth), MAX_COLLATERAL_AMOUNT);
+    }
+
     /**
      * @dev liquidate(address collateral, address user, uint256 debtToCover)
      * 参数校验：
