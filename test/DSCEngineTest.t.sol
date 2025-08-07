@@ -243,14 +243,28 @@ contract DSCEngineTest is Test {
         assertEq(engine.getDscMinted(alice), mintAmt);
     }
 
-    function test_calculateHealthFactor_zeroDebt_returnsMax() public view{
+    function test_calculateHealthFactor_zeroDebt_returnsMax() public view {
         uint256 hf = engine.calculateHealthFactor(0, 123);
         assertEq(hf, type(uint256).max);
     }
 
-    function test_calculateHealthFactor_formula() public view{
+    function test_calculateHealthFactor_formula() public view {
         uint256 hf = engine.calculateHealthFactor(100 ether, 200 ether); // 200USD 抵押, 100DSC 债务
         assertEq(hf, 1e18); // (200*50%)/100 = 1  → 1e18
+    }
+
+    function test_getAccountCollateralValue_multiToken() public {
+        vm.startPrank(alice);
+        weth.approve(address(engine), 10 ether);
+        wbtc.approve(address(engine), 10 ether);
+        engine.depositCollateral(chainConfig.weth, 10 ether);
+        engine.depositCollateral(chainConfig.wbtc, 10 ether);
+        vm.stopPrank();
+
+        uint256 expectUsd =
+            engine.getUsdValue(chainConfig.weth, 10 ether) + engine.getUsdValue(chainConfig.wbtc, 10 ether);
+
+        assertEq(engine.getAccountCollateralValue(alice), expectUsd);
     }
 
     /**
