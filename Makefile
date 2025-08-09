@@ -77,40 +77,22 @@ errors: ## 列出指定合约里所有自定义错误及其 selector；如果传
 	fi
 
 ### ========== 本地链 ==========
-anvil: ## 启动本地 Anvil（12s出块，含助记词）
+anvil:
 	@echo "🚀 Starting local Anvil chain..."
-	anvil -m 'test test test test test test test test test test test junk' --steps-tracing --block-time 12
+	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --base-fee 0 --gas-price 0
 
 ### ========== 一键部署 ==========
 deploy-anvil: ## 部署到本地 Anvil
 	@echo "🚀 Deploying to local Anvil..."
-	@forge script script/DeployAll.s.sol:DeployAll --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY) --broadcast -vvv
+	@forge script script/DeployDSCEngine.s.sol:DeployDSCEngine --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY) --broadcast -vvv
 
 deploy-sepolia: ## 部署到 Sepolia（含 Etherscan 验证）
 	@echo "🚀 Deploying to Sepolia..."
-	@forge script script/DeployAll.s.sol:DeployAll --rpc-url $(SEPOLIA_RPC_URL) --private-key $(SEPOLIA_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
+	@forge script script/DeployDSCEngine.s.sol:DeployDSCEngine --rpc-url $(SEPOLIA_RPC_URL) --private-key $(SEPOLIA_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
 
 deploy-mainnet: ## 部署到 Mainnet（含 Etherscan 验证）
 	@echo "🚀 Deploying to Mainnet..."
-	@forge script script/DeployAll.s.sol:DeployAll --rpc-url $(MAINNET_RPC_URL) --private-key $(MAINNET_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
-
-### ========== 单独部署 ==========
-deploy-pass: ## 仅部署：KYC Pass NFT（到 Anvil）
-	@echo "🚀 Deploying to local Anvil..."
-	@forge script script/DeployKycPassNFT.s.sol:DeployKycPassNFT --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY) --broadcast -vvv
-
-deploy-share: ## 仅部署：Vault Token（到 Anvil）
-	@echo "🚀 Deploying to local Anvil..."
-	@forge script script/DeployVaultToken.s.sol:DeployVaultToken --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY) --broadcast -vvv
-
-### ========== NFT ==========
-deploy-Luffy: ## 部署示例 NFT（到 Sepolia，含验证）
-	@echo "🚀 Deploying to Sepolia..."
-	@forge script script/DeployBasicNFT.s.sol:DeployBasicNFT --rpc-url $(SEPOLIA_RPC_URL) --private-key $(SEPOLIA_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
-
-Mint-Luffy: ## 自动铸造示例 NFT（到 Sepolia）
-	@echo "🚀 Mint NFT to Sepolia..."
-	@forge script script/autoMintNFT.s.sol:autoMintLuffyNFT --rpc-url $(SEPOLIA_RPC_URL) --private-key $(SEPOLIA_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
+	@forge script script/DeployDSCEngine.s.sol:DeployDSCEngine --rpc-url $(MAINNET_RPC_URL) --private-key $(MAINNET_PRIVATE_KEY) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvv
 
 ### ========== 实用工具 ==========
 check-balance: ## 查询钱包地址与 ETH 余额（Sepolia）
