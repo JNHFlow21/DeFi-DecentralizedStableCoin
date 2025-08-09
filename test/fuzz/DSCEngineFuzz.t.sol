@@ -27,9 +27,9 @@ contract DSCEngineFuzz is Test {
     address alice = makeAddr("alice");
 
     // 你的精度约定
-    uint256 constant TOKEN_1 = 1e18;  // 抵押物精度
-    uint256 constant USD_1 = 1e18;    // USD 内部使用 1e18
-    uint256 constant PRICE_1 = 1e8;   // 预言机价格精度
+    uint256 constant TOKEN_1 = 1e18; // 抵押物精度
+    uint256 constant USD_1 = 1e18; // USD 内部使用 1e18
+    uint256 constant PRICE_1 = 1e8; // 预言机价格精度
 
     function setUp() public {
         DeployDSCEngine d = new DeployDSCEngine();
