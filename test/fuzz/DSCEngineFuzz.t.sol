@@ -9,6 +9,12 @@ import {DeployDSCEngine} from "../../script/DeployDSCEngine.s.sol";
 import {ChainConfig} from "../../script/HelperConfig.s.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 
+/**
+ * 无状态测试（stateless fuzz test）：
+ * - 不依赖合约的历史状态，仅依赖本次调用的输入参数和输出结果
+ * - 只测试单个函数的逻辑，不会在多次调用间保留状态（memoryless）
+ * - 重点在于通过随机化/约束输入范围，验证函数在各种可能输入下的正确性
+ */
 contract DSCEngineFuzz is Test {
     DSCEngine engine;
     DecentralizedStableCoin dsc;
