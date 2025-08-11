@@ -50,24 +50,35 @@ contract HelperConfig is Script {
         return activeChainConfig;
     }
 
-    function getOrCreateAnvilConfig() public returns (ChainConfig memory AnvilConfig) {
-        vm.startBroadcast();
+    // function getOrCreateAnvilConfig() public returns (ChainConfig memory AnvilConfig) {
+    //     vm.startBroadcast();
 
-        MockV3Aggregator wethPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_ETH_PRICE);
-        MockV3Aggregator wbtcPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_BTC_PRICE);
+    //     MockV3Aggregator wethPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_ETH_PRICE);
+    //     MockV3Aggregator wbtcPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_BTC_PRICE);
 
-        // erc20 token
-        MockToken weth = new MockToken("WETH", "WETH");
-        MockToken wbtc = new MockToken("WBTC", "WBTC");
+    //     // erc20 token
+    //     MockToken weth = new MockToken("WETH", "WETH");
+    //     MockToken wbtc = new MockToken("WBTC", "WBTC");
 
-        vm.stopBroadcast();
+    //     vm.stopBroadcast();
 
+    //     AnvilConfig = ChainConfig({
+    //         deployerPrivateKey: vm.envUint(ANVIL_PRIVATE_KEY),
+    //         wethUsdPriceFeed: address(wethPriceFeed),
+    //         wbtcUsdPriceFeed: address(wbtcPriceFeed),
+    //         weth: address(weth),
+    //         wbtc: address(wbtc)
+    //     });
+    //     return AnvilConfig;
+    // }
+
+    function getOrCreateAnvilConfig() public view returns (ChainConfig memory AnvilConfig) {
         AnvilConfig = ChainConfig({
             deployerPrivateKey: vm.envUint(ANVIL_PRIVATE_KEY),
-            wethUsdPriceFeed: address(wethPriceFeed),
-            wbtcUsdPriceFeed: address(wbtcPriceFeed),
-            weth: address(weth),
-            wbtc: address(wbtc)
+            wethUsdPriceFeed: address(0),
+            wbtcUsdPriceFeed: address(0),
+            weth: address(0),
+            wbtc: address(0)
         });
         return AnvilConfig;
     }

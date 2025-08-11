@@ -79,7 +79,7 @@ errors: ## 列出指定合约里所有自定义错误及其 selector；如果传
 ### ========== 本地链 ==========
 anvil:
 	@echo "🚀 Starting local Anvil chain..."
-	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --base-fee 0 --gas-price 0
+	anvil -m 'test test test test test test test test test test test junk' --steps-tracing --block-time 12
 
 ### ========== 一键部署 ==========
 deploy-anvil: ## 部署到本地 Anvil

@@ -7,8 +7,15 @@ import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {HelperConfig, ChainConfig} from "./HelperConfig.s.sol";
 import {DSCEngine} from "../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
+import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import {MockToken} from "../src/mocks/mock_WETH_WBTC.sol";
 
 contract DeployDSCEngine is Script {
+    // Price Feed Variables
+    uint8 public constant DECIMALS = 8;
+    int256 public constant INITIAL_ETH_PRICE = 3000e8;
+    int256 public constant INITIAL_BTC_PRICE = 11000e8;
+
     HelperConfig helperConfig = new HelperConfig();
     ChainConfig chainConfig = helperConfig.getActiveChainConfig();
 
@@ -17,6 +24,20 @@ contract DeployDSCEngine is Script {
 
     function run() public returns (DecentralizedStableCoin, DSCEngine, ChainConfig memory) {
         vm.startBroadcast(chainConfig.deployerPrivateKey);
+        // 部署 weth/wbtc 以及mockpricefeed
+        if (chainConfig.weth == address(0) || chainConfig.wbtc == address(0) || chainConfig.wethUsdPriceFeed == address(0) || chainConfig.wbtcUsdPriceFeed == address(0)) {
+        MockV3Aggregator wethPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_ETH_PRICE);
+        MockV3Aggregator wbtcPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_BTC_PRICE);
+
+        // erc20 token
+        MockToken weth = new MockToken("WETH", "WETH");
+        MockToken wbtc = new MockToken("WBTC", "WBTC");
+
+        chainConfig.weth = address(weth);
+        chainConfig.wbtc = address(wbtc);
+        chainConfig.wethUsdPriceFeed = address(wethPriceFeed);
+        chainConfig.wbtcUsdPriceFeed = address(wbtcPriceFeed);
+        }
         DecentralizedStableCoin dsc = new DecentralizedStableCoin();
 
         initTokenAddressesAndPriceFeed();
