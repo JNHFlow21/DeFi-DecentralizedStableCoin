@@ -17,6 +17,15 @@ contract Handler is Test {
 
     uint96 constant MAX_DEPOSIT = type(uint96).max; // 省gas，且96的max已经够用了
 
+    /**
+     * @notice 初始化 Handler，注入引擎、稳定币与两种抵押品及其价格源
+     * @param _engine DSCEngine 合约
+     * @param _dsc 稳定币合约
+     * @param weth_ WETH 地址
+     * @param wbtc_ WBTC 地址
+     * @param ethFeed_ WETH/USD 价格源
+     * @param btcFeed_ WBTC/USD 价格源
+     */
     constructor(
         DSCEngine _engine,
         DecentralizedStableCoin _dsc,
@@ -35,6 +44,11 @@ contract Handler is Test {
 
     // ==== Actions（Fuzzer 会随机挑一部分顺序执行）====
 
+    /**
+     * @notice 铸造并抵押随机一种抵押物
+     * @param seed 选择 WETH/WBTC 的种子
+     * @param amount 铸造并抵押的数量
+     */
     function mintAndDepositCollateral(uint256 seed, uint256 amount) public {
         amount = bound(amount, 1, MAX_DEPOSIT);
         MockToken col = _pick(seed);
@@ -46,6 +60,10 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice 在抵押额度内铸造 DSC
+     * @param amount 期望铸造数量（将按额度约束）
+     */
     function mintDsc(uint256 amount) public {
         // 当前抵押总美元价值
         uint256 colUsd = engine.getAccountCollateralValue(msg.sender);
@@ -65,6 +83,10 @@ contract Handler is Test {
         try engine.mintDsc(amount) {} catch { /* 允许在 ContinueOnRevert 套件里继续 */ }
     }
 
+    /**
+     * @notice 烧毁调用者持有的 DSC，最多烧到当前余额
+     * @param amount 期望销毁数量
+     */
     function burnDsc(uint256 amount) public {
         amount = bound(amount, 0, dsc.balanceOf(msg.sender));
         if (amount == 0) return;
@@ -74,6 +96,11 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice 赎回调用者的部分抵押物
+     * @param seed 选择 WETH/WBTC 的种子
+     * @param amount 期望赎回数量（将按余额约束）
+     */
     function redeemCollateral(uint256 seed, uint256 amount) public {
         MockToken col = _pick(seed);
         uint256 maxAmt = engine.getCollateralBalanceOfUser(msg.sender, address(col));
@@ -84,6 +111,12 @@ contract Handler is Test {
         try engine.redeemCollateral(address(col), amount) {} catch {}
     }
 
+    /**
+     * @notice 清算目标用户的部分债务
+     * @param seed 选择 WETH/WBTC 的种子
+     * @param user 被清算用户
+     * @param debtToCover 覆盖的 DSC 债务
+     */
     function liquidate(uint256 seed, address user, uint256 debtToCover) public {
         MockToken col = _pick(seed);
         debtToCover = bound(debtToCover, 1e18, uint256(MAX_DEPOSIT));
@@ -97,6 +130,10 @@ contract Handler is Test {
     }
 
     // 价格更新（同精度 1e8）
+    /**
+     * @notice 更新 ETH/USD 喂价（受上下限约束）
+     * @param p 新价格（同精度 1e8）
+     */
     function updateEthPrice(uint96 p) public {
         uint8 dec = ethFeed.decimals(); // 通常 8
         uint256 min = 500 * 10 ** dec; // $500
@@ -105,6 +142,10 @@ contract Handler is Test {
         ethFeed.updateAnswer(int256(bounded));
     }
 
+    /**
+     * @notice 更新 BTC/USD 喂价（受上下限约束）
+     * @param p 新价格（同精度 1e8）
+     */
     function updateBtcPrice(uint96 p) public {
         uint8 dec = btcFeed.decimals();
         uint256 min = 10_000 * 10 ** dec; // 例如 $10k
@@ -114,6 +155,11 @@ contract Handler is Test {
     }
 
     // ==== helpers ====
+    /**
+     * @notice 根据种子在 WETH/WBTC 中二选一
+     * @param seed 输入种子
+     * @return 选中的 MockToken
+     */
     function _pick(uint256 seed) internal view returns (MockToken) {
         return (seed % 2 == 0) ? weth : wbtc;
     }

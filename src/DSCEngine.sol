@@ -171,6 +171,12 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     // constructor
+    /**
+     * @notice 初始化引擎，绑定允许的抵押物与其价格预言机，并设定底层 `DSC` 合约地址
+     * @param tokenAddresses 被允许的抵押 token 地址列表
+     * @param priceFeedAddresses 对应的价格预言机地址列表（与 `tokenAddresses` 一一对应）
+     * @param dscAddress 底层稳定币 `DecentralizedStableCoin` 合约地址
+     */
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
         // 首先检查长度是否一致，不一致直接revert
         if (tokenAddresses.length != priceFeedAddresses.length) {
@@ -185,10 +191,12 @@ contract DSCEngine is ReentrancyGuard {
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
 
+    /// @notice 拒绝直接向引擎合约转入原生币（无业务意义）
     receive() external payable {
         revert DSCEngine__CallNotAllowed();
     }
 
+    /// @notice 拒绝未知调用（防止误调用或错误转账）
     fallback() external payable {
         revert DSCEngine__CallNotAllowed();
     }
@@ -495,6 +503,12 @@ contract DSCEngine is ReentrancyGuard {
 
     // view & pure functions
 
+    /**
+     * @notice 计算健康因子（纯函数封装）
+     * @param totalDscMinted 已铸造的 DSC 债务（1e18 精度）
+     * @param collateralValueInUsd 抵押物的 USD 价值（1e18 精度）
+     * @return 健康因子（1e18 精度，越大越安全）
+     */
     function calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
         external
         pure
@@ -503,6 +517,12 @@ contract DSCEngine is ReentrancyGuard {
         return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
     }
 
+    /**
+     * @notice 获取账户的债务与抵押价值
+     * @param user 目标账户
+     * @return totalDscMinted 账户当前债务（已铸造 DSC）
+     * @return collateralValueInUsd 抵押物 USD 总价值
+     */
     function getAccountInformation(address user)
         external
         view
@@ -511,56 +531,108 @@ contract DSCEngine is ReentrancyGuard {
         return _getAccountInformation(user);
     }
 
+    /**
+     * @notice 查询给定 token 数量的 USD 价值
+     * @param token token 地址
+     * @param amount token 数量（最小单位）
+     * @return 以 1e18 精度表示的 USD 价值
+     */
     function getUsdValue(address token, uint256 amount) external view returns (uint256) {
         return _getUsdValue(token, amount);
     }
 
+    /**
+     * @notice 获取用户在某个抵押 token 上的抵押余额
+     * @param user 用户地址
+     * @param token 抵押 token 地址
+     * @return 抵押数量
+     */
     function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
         return s_collateralDeposited[user][token];
     }
 
     // Accessors for constants and state
 
+    /**
+     * @notice 获取内部统一精度（用于比率/因子计算）
+     */
     function getPrecision() external pure returns (uint256) {
         return PRECISION;
     }
 
+    /**
+     * @notice 获取清算阈值（百分比，例：50 表示 50%）
+     */
     function getLiquidationThreshold() external pure returns (uint256) {
         return LIQUIDATION_THRESHOLD;
     }
 
+    /**
+     * @notice 获取清算奖励（百分比，例：10 表示 10%）
+     */
     function getLiquidationBonus() external pure returns (uint256) {
         return LIQUIDATION_BONUS;
     }
 
+    /**
+     * @notice 获取清算相关百分比的分母基准（通常为 100）
+     */
     function getLiquidationPrecision() external pure returns (uint256) {
         return LIQUIDATION_PRECISION;
     }
 
+    /**
+     * @notice 获取最小健康因子阈值（小于该值可被清算）
+     */
     function getMinHealthFactor() external pure returns (uint256) {
         return MIN_HEALTH_FACTOR;
     }
 
+    /**
+     * @notice 获取当前支持的所有抵押 token 列表
+     */
     function getCollateralTokens() external view returns (address[] memory) {
         return s_collateralTokens;
     }
 
+    /**
+     * @notice 获取底层稳定币 `DSC` 合约地址
+     */
     function getDsc() external view returns (address) {
         return address(i_dsc);
     }
 
+    /**
+     * @notice 查询抵押 token 对应的价格预言机地址
+     * @param token 抵押 token 地址
+     */
     function getCollateralTokenPriceFeed(address token) external view returns (address) {
         return s_collateralTokenToPriceFeed[token];
     }
 
+    /**
+     * @notice 获取用户当前健康因子
+     * @param user 用户地址
+     * @return 健康因子（1e18 精度）
+     */
     function getHealthFactor(address user) external view returns (uint256) {
         return _healthFactor(user);
     }
 
+    /**
+     * @notice 获取用户已铸造的 DSC 债务
+     * @param user 用户地址
+     */
     function getDscMinted(address user) external view returns (uint256) {
         return s_DSCMinted[user];
     }
 
+    /**
+     * @notice 反向计算：给定 USD 金额，需要多少该 token 抵押（不含清算奖励）
+     * @param token 抵押 token 地址
+     * @param usdAmount 需要覆盖的 USD 金额（1e18 精度）
+     * @return 需要的 token 数量（1e18 精度）
+     */
     function getCollateralAmountFromUsd(address token, uint256 usdAmount) external view returns (uint256) {
         return _getTokenAmountFromUsd(token, usdAmount);
     }

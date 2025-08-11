@@ -43,12 +43,20 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     error DecentralizedStableCoin__AmountMustBeGreaterThanZero();
     error DecentralizedStableCoin__BurnAmountExceedsBalance();
 
+    /**
+     * @notice 构造函数，初始化 ERC20 名称与符号，并设置合约所有者
+     * @dev 通过 `Ownable(msg.sender)` 指定初始 owner
+     */
     constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(msg.sender) {}
 
+    /**
+     * @notice 仅所有者可销毁自身账户中的 DSC
+     * @dev _burn 会检查 0 地址，因此这里只需校验两点：
+     *  1. amount <= 0 revert
+     *  2. amount > balanceOf(msg.sender) revert
+     * @param amount 销毁数量
+     */
     function burn(uint256 amount) public override onlyOwner {
-        // _burn()会检查0地址，所以我们只需要判断
-        // 1. amount <= 0 revert
-        // 2. amount > balanceOf(msg.sender) revert
         if (amount <= 0) {
             revert DecentralizedStableCoin__AmountMustBeGreaterThanZero();
         }
@@ -58,9 +66,15 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         super.burn(amount);
     }
 
+    /**
+     * @notice 仅所有者可铸造 DSC 到指定地址
+     * @dev _mint 会检查 0 地址，因此这里只需校验一点：
+     *  1. amount <= 0 revert
+     * @param to 接收铸造代币的地址
+     * @param amount 铸造数量
+     * @return 成功与否
+     */
     function mint(address to, uint256 amount) external onlyOwner returns (bool) {
-        // _mint()会检查0地址，所以我们只需要判断
-        // 1. amount <= 0 revert
         if (amount <= 0) {
             revert DecentralizedStableCoin__AmountMustBeGreaterThanZero();
         }

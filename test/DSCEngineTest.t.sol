@@ -49,6 +49,9 @@ contract DSCEngineTest is Test {
     uint256 public constant MAX_COLLATERAL_AMOUNT = 100e18;
     uint256 public constant DEBT_ALLOWED_IN_WETH = 100000e18; // 允许的贷款额度
 
+    /**
+     * @notice 部署系统并准备测试账户与初始资产
+     */
     function setUp() public {
         deployer = new DeployDSCEngine();
         (dsc, engine, chainConfig) = deployer.run();
@@ -69,6 +72,9 @@ contract DSCEngineTest is Test {
         junkToken.mint(bob, INITIAL_TOKEN_AMOUNT);
     }
 
+    /**
+     * @notice 引擎构造函数应正确设置核心依赖与白名单
+     */
     function test_engine_constructor() public view {
         assertEq(engine.getDsc(), address(dsc));
 
@@ -81,6 +87,9 @@ contract DSCEngineTest is Test {
         assertEq(engine.getCollateralTokenPriceFeed(chainConfig.wbtc), chainConfig.wbtcUsdPriceFeed);
     }
 
+    /**
+     * @notice fallback/receive 均应拒绝调用
+     */
     function test_fallback_receive_reverts() public {
         vm.startPrank(user);
         vm.deal(user, 1 ether);
@@ -97,6 +106,9 @@ contract DSCEngineTest is Test {
 
     /**
      * @dev 用户成功抵押token，然后mint dsc
+     */
+    /**
+     * @notice 用户成功抵押并铸造 DSC
      */
     function test_depositCollateralAndMintDsc_success() public {
         vm.startPrank(alice);
@@ -127,6 +139,9 @@ contract DSCEngineTest is Test {
         assertEq(engine.getHealthFactor(alice), engine.getMinHealthFactor());
     }
 
+    /**
+     * @notice 非白名单抵押品应被拒绝
+     */
     function test_depositCollateralAndMintDsc_reverts_DSCEngine__TokenNotAllowed() public {
         vm.startPrank(alice);
         weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
@@ -137,6 +152,9 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice 赎回抵押并归还等额 DSC 债务
+     */
     function test_redeemCollateralForDsc_success() public {
         vm.startPrank(alice);
         // 抵押物品
@@ -168,6 +186,9 @@ contract DSCEngineTest is Test {
     /**
      * @dev 仅赎回：不改变债务，只执行 _redeemCollateral，触发 CollateralRedeemed 并做 HF 校验。
      */
+    /**
+     * @notice 仅赎回：不改变债务，只触发 CollateralRedeemed 与 HF 校验
+     */
     function test_redeemCollateral_success() public {
         vm.startPrank(alice);
         // 抵押物品
@@ -186,6 +207,9 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice 仅还债：减少债务并触发 DscBurned
+     */
     function test_burnDsc_success() public {
         vm.startPrank(alice);
         // 先抵押并铸 100 000 DSC
@@ -210,6 +234,9 @@ contract DSCEngineTest is Test {
         assertEq(dsc.balanceOf(alice), MAX_DEBT_IN_WETH - burnAmt);
     }
 
+    /**
+     * @notice 仅抵押：应成功并记账
+     */
     function test_depositCollateral_only_success() public {
         vm.startPrank(alice);
         weth.approve(address(engine), MAX_COLLATERAL_AMOUNT);
@@ -223,6 +250,9 @@ contract DSCEngineTest is Test {
         assertEq(engine.getCollateralBalanceOfUser(alice, chainConfig.weth), MAX_COLLATERAL_AMOUNT);
     }
 
+    /**
+     * @notice 仅铸造：在已有抵押的情况下应成功
+     */
     function test_mintDsc_only_success() public {
         vm.startPrank(alice);
         // 先只抵押
@@ -243,16 +273,25 @@ contract DSCEngineTest is Test {
         assertEq(engine.getDscMinted(alice), mintAmt);
     }
 
+    /**
+     * @notice calculateHealthFactor: 零债务返回最大值
+     */
     function test_calculateHealthFactor_zeroDebt_returnsMax() public view {
         uint256 hf = engine.calculateHealthFactor(0, 123);
         assertEq(hf, type(uint256).max);
     }
 
+    /**
+     * @notice calculateHealthFactor: 公式校验
+     */
     function test_calculateHealthFactor_formula() public view {
         uint256 hf = engine.calculateHealthFactor(100 ether, 200 ether); // 200USD 抵押, 100DSC 债务
         assertEq(hf, 1e18); // (200*50%)/100 = 1  → 1e18
     }
 
+    /**
+     * @notice 多抵押品时的总 USD 价值应为逐项相加
+     */
     function test_getAccountCollateralValue_multiToken() public {
         vm.startPrank(alice);
         weth.approve(address(engine), 10 ether);
@@ -281,6 +320,9 @@ contract DSCEngineTest is Test {
      * 	3.	执行 _burnDsc，触发 DscBurned；
      * 	4.	触发 LiquidationPerformed 事件；
      * 	•	重入保护：多次调用 liquidate 应受 nonReentrant 保护。
+     */
+    /**
+     * @notice 正常清算流程：部分覆盖债务 + 领取抵押与奖励 + 事件校验
      */
     function test_liquidate_success() public {
         vm.startPrank(alice);

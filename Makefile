@@ -38,10 +38,9 @@ all: clean install update build ## 一键清理→安装→更新→编译
 clean: ## 清理构建产物
 	forge clean
 
-install: ## 安装依赖（forge-std）
+install: ## 安装依赖
 	forge install foundry-rs/forge-std
 	forge install OpenZeppelin/openzeppelin-contracts@v5.4.0
-	forge install Cyfrin/foundry-devops
 	forge install smartcontractkit/chainlink-brownie-contracts
 
 update: ## 更新依赖

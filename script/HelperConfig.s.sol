@@ -32,6 +32,10 @@ contract HelperConfig is Script {
     int256 public constant INITIAL_ETH_PRICE = 3000e8;
     int256 public constant INITIAL_BTC_PRICE = 11000e8;
 
+    /**
+     * @notice 根据当前网络自动选择链上配置
+     * @dev 31337/1337 -> Anvil，本地；11155111 -> Sepolia；1 -> Mainnet
+     */
     constructor() {
         uint256 chainId = block.chainid;
         if (chainId == 31337 || chainId == 1337) {
@@ -45,7 +49,10 @@ contract HelperConfig is Script {
         }
     }
 
-    // 要想在部署脚本中可见，必须使用external
+    /**
+     * @notice 获取当前激活的链配置
+     * @dev 要想在部署脚本中可见，必须使用 external
+     */
     function getActiveChainConfig() external view returns (ChainConfig memory) {
         return activeChainConfig;
     }
@@ -72,6 +79,9 @@ contract HelperConfig is Script {
     //     return AnvilConfig;
     // }
 
+    /**
+     * @notice 获取（或在需要时创建）本地 Anvil 配置
+     */
     function getOrCreateAnvilConfig() public view returns (ChainConfig memory AnvilConfig) {
         AnvilConfig = ChainConfig({
             deployerPrivateKey: vm.envUint(ANVIL_PRIVATE_KEY),
@@ -83,6 +93,9 @@ contract HelperConfig is Script {
         return AnvilConfig;
     }
 
+    /**
+     * @notice 获取 Sepolia 配置
+     */
     function getSepoliaConfig() public view returns (ChainConfig memory SepoliaConfig) {
         SepoliaConfig = ChainConfig({
             deployerPrivateKey: vm.envUint(SEPOLIA_PRIVATE_KEY),
@@ -94,6 +107,9 @@ contract HelperConfig is Script {
         return SepoliaConfig;
     }
 
+    /**
+     * @notice 获取 Mainnet 配置（占位）
+     */
     function getMainnetConfig() public pure returns (ChainConfig memory MainnetConfig) {
         return MainnetConfig;
     }

@@ -22,6 +22,12 @@ contract DeployDSCEngine is Script {
     address[] private s_tokenAddresses;
     address[] private s_priceFeedAddresses;
 
+    /**
+     * @notice 部署 DSC 与 DSCEngine，并在本地缺省时部署 Mock 资产与价格源
+     * @return dsc 已部署的稳定币实例
+     * @return engine 已部署的引擎实例
+     * @return cfg 使用的链配置（含资产与喂价地址）
+     */
     function run() public returns (DecentralizedStableCoin, DSCEngine, ChainConfig memory) {
         vm.startBroadcast(chainConfig.deployerPrivateKey);
         // 部署 weth/wbtc 以及mockpricefeed
@@ -50,6 +56,9 @@ contract DeployDSCEngine is Script {
         return (dsc, engine, chainConfig);
     }
 
+    /**
+     * @notice 初始化引擎构造所需的 token 与 price feed 地址数组
+     */
     function initTokenAddressesAndPriceFeed() private {
         s_tokenAddresses = [chainConfig.weth, chainConfig.wbtc];
         s_priceFeedAddresses = [chainConfig.wethUsdPriceFeed, chainConfig.wbtcUsdPriceFeed];

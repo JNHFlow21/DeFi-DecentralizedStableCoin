@@ -20,6 +20,9 @@ contract DSCEngineInvariants is StdInvariant, Test {
 
     Handler handler;
 
+    /**
+     * @notice 部署系统与 handler，并设置为不变量测试的目标合约
+     */
     function setUp() external {
         DeployDSCEngine d = new DeployDSCEngine();
         (dsc, engine, cfg) = d.run();
@@ -34,6 +37,9 @@ contract DSCEngineInvariants is StdInvariant, Test {
     }
 
     /// 不变量 1：协议资产价值 >= DSC 总供应（美元）
+    /**
+     * @notice 不变量 1：协议资产价值 >= DSC 总供应（美元）
+     */
     function invariant_protocolSolvent() public view {
         uint256 totalSupply = dsc.totalSupply();
 
@@ -47,6 +53,9 @@ contract DSCEngineInvariants is StdInvariant, Test {
     }
 
     /// 不变量 2：常用 getters 不应 revert
+    /**
+     * @notice 不变量 2：常用 getters 不应 revert
+     */
     function invariant_gettersNoRevert() public view {
         engine.getCollateralTokens();
         engine.getLiquidationBonus();
