@@ -25,6 +25,7 @@ pragma solidity ^0.8.20;
 
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {PriceConverter} from "./_library/PriceConverter.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -33,7 +34,7 @@ contract DSCEngine is ReentrancyGuard {
      * !!! -------------- 注意精度问题--------------------
      * 代码中的 所有 DSC 精度都是 1e18， 因为ERC20的decimal是18
      * 所有 ETH/USDC 精度都是 1e8
-     * 所有 抵押物 精度都是 1e18
+     * 抵押物在内部统一归一到 1e18（按 token decimals 自动缩放）
      * 所有 债务 精度都是 1e18
      * 所有 健康因子 精度都是 1e18
      * 所有 抵押物价值 精度都是 1e18
@@ -318,7 +319,7 @@ contract DSCEngine is ReentrancyGuard {
      * @notice 单独铸造 DSC（不附带抵押操作）
      * @param amountDscToMint 铸造数量
      */
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) {
+    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
         _mintDsc(amountDscToMint, msg.sender);
     }
 
@@ -449,14 +450,16 @@ contract DSCEngine is ReentrancyGuard {
      *  3. 返回token的USD价值
      */
     function _getUsdValue(address token, uint256 amount) internal view returns (uint256) {
-        return amount.getUsdValue(s_collateralTokenToPriceFeed[token]);
+        uint256 normalizedAmount = _scaleAmountTo18Decimals(token, amount);
+        return normalizedAmount.getUsdValue(s_collateralTokenToPriceFeed[token]);
     }
 
     /**
      * @dev 获取usd价值对应的抵押物token 数量，1e18精度
      */
     function _getTokenAmountFromUsd(address token, uint256 usdAmount) internal view returns (uint256) {
-        return usdAmount.getTokenAmount(s_collateralTokenToPriceFeed[token]);
+        uint256 normalizedTokenAmount = usdAmount.getTokenAmount(s_collateralTokenToPriceFeed[token]);
+        return _scaleAmountFrom18Decimals(token, normalizedTokenAmount);
     }
 
     // private
@@ -499,6 +502,28 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) {
             revert DSCEngine__TransferFailed();
         }
+    }
+
+    function _scaleAmountTo18Decimals(address token, uint256 amount) private view returns (uint256) {
+        uint256 decimals = uint256(IERC20Metadata(token).decimals());
+        if (decimals == 18) {
+            return amount;
+        }
+        if (decimals < 18) {
+            return amount * (10 ** (18 - decimals));
+        }
+        return amount / (10 ** (decimals - 18));
+    }
+
+    function _scaleAmountFrom18Decimals(address token, uint256 amount) private view returns (uint256) {
+        uint256 decimals = uint256(IERC20Metadata(token).decimals());
+        if (decimals == 18) {
+            return amount;
+        }
+        if (decimals < 18) {
+            return amount / (10 ** (18 - decimals));
+        }
+        return amount * (10 ** (decimals - 18));
     }
 
     // view & pure functions
